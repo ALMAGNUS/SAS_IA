@@ -34,17 +34,9 @@ def test_predict_value():
     response = client.get("/predict")
     assert response.status_code == 200
     data = response.json()
-    for i in data:
+    for i in data["prediction"]:
         assert i == 1 or i == 0
 
-"""
-def test_predict_proba_range():
-    # S'assure qu'il y a au moins un dataset
-    client.post("/generate", json={"n_samples": 10})
-    response = client.get("/predict")
-    data = response.json()
-    probas = [row["proba_1"] for row in data["predictions_sample"]]
-    assert all(0.0 <= p <= 1.0 for p in probas)
 
 def test_generate_hour_sign():
     response = client.post("/generate", json={"n_samples": 5})
@@ -53,4 +45,4 @@ def test_generate_hour_sign():
     assert "columns_inverted" in data
     assert isinstance(data["hour"], int)
     assert isinstance(data["columns_inverted"], bool)
-"""
+

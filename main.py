@@ -48,10 +48,12 @@ def generate_dataset(req: GenerateRequest):
     df = pd.DataFrame(X, columns=["feature1", "feature2"])
     df["target"] = y
 
+    columns_inverted = False
     # Si l'heure est impaire, on inverse les colonnes de la classe (feature1 <-> feature2)
     if hour % 2 == 1:
         df[["feature1", "feature2"]] = df[["feature2", "feature1"]]
         df = df.rename(columns={"feature2": "feature1", "feature1": "feature2"})
+        columns_inverted = True
 
     # Conversion du DataFrame en JSON (string)
     json_data = df.to_json(orient="records")
@@ -64,7 +66,7 @@ def generate_dataset(req: GenerateRequest):
     db.refresh(dataset)
     db.close()
 
-    return {"dataset_id": dataset.id, "n_samples": n, "hour": hour, "sign": sign}
+    return {"dataset_id": dataset.id, "n_samples": n, "hour": hour, "sign": sign, "columns_inverted": columns_inverted}
 
 
 @app.get("/predict")
@@ -89,7 +91,7 @@ def predict():
 
     print(f"Prédiction : {y_pred}")
 
-    return y_pred
+    return {"prediction": y_pred.tolist()}
 
 
 @app.get("/health")
