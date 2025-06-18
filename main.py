@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
@@ -7,6 +8,7 @@ from datetime import datetime
 import pandas as pd
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
 import pickle
 import mlflow
 import mlflow.sklearn
@@ -33,6 +35,30 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 class GenerateRequest(BaseModel):
     n_samples: int = 100
+
+
+def make_prediction():
+    db = SessionLocal()
+    dataset = db.query(Dataset).order_by(Dataset.id.desc()).first()
+    db.close()
+    logger.info("Dataset retrieved from database")
+
+    if not dataset:
+        logger.error("No dataset found")
+        return {"error": "No dataset found"}
+
+    # Conversion du JSON en DataFrame
+    df = pd.read_json(dataset.data, orient="records")
+    df = df[["feature1", "feature2"]]
+
+    # Chargement du modèle
+    with open("model.pkl", "rb") as f:
+        loaded_model = pickle.load(f)
+
+    # Prédiction
+    y_pred = loaded_model.predict(df)
+
+    return y_pred
 
 
 @app.post("/generate")
@@ -84,25 +110,7 @@ def generate_dataset(req: GenerateRequest):
 
 @app.get("/predict")
 def predict():
-    db = SessionLocal()
-    dataset = db.query(Dataset).order_by(Dataset.id.desc()).first()
-    db.close()
-    logger.info("Dataset retrieved from database")
-
-    if not dataset:
-        logger.error("No dataset found")
-        return {"error": "No dataset found"}
-
-    # Conversion du JSON en DataFrame
-    df = pd.read_json(dataset.data, orient="records")
-    df = df[["feature1", "feature2"]]
-
-    # Chargement du modèle
-    with open("model.pkl", "rb") as f:
-        loaded_model = pickle.load(f)
-
-    # Prédiction
-    y_pred = loaded_model.predict(df)
+    y_pred = make_prediction()
 
     print(f"Prédiction : {y_pred}")
 
@@ -111,11 +119,23 @@ def predict():
 
 @app.get("/health")
 def health():
-    return "OK", 200
+    return JSONResponse(content="OK", status_code=200)
 
 
 @app.post("/retrain")
 def retrain_model():
+    PERFORMANCE_THRESHOLD = 0.50
+
+    y_pred = make_prediction()
+    acc = accuracy_score(y, y_pred)
+
+    if acc >= PERFORMANCE_THRESHOLD:
+        return {
+            "status": "Pas de réentraînement nécessaire",
+            "accuracy": acc,
+            "threshold": PERFORMANCE_THRESHOLD
+        }
+
     db = SessionLocal()
     # Récupérer le dernier dataset
     last_dataset = db.query(Dataset).order_by(Dataset.id.desc()).first()

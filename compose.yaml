@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   fastapi:
     build: .
@@ -8,8 +6,8 @@ services:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
-    depends_on:
-      - prometheus
+    networks:
+      - app_network
 
   prometheus:
     image: prom/prometheus:latest
@@ -20,7 +18,7 @@ services:
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
     depends_on:
-      - api
+      - fastapi
     networks:
       - app_network
 
@@ -39,6 +37,16 @@ services:
     networks:
       - app_network
 
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime-kuma
+    ports:
+      - "3001:3001"  
+    volumes:
+      - ./uptime-kuma-data:/app/data
+    restart: always
+    networks:
+      - app_network
+
 networks:
-  default:
-    driver: bridge
+  app_network:
