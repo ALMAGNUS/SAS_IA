@@ -53,3 +53,14 @@ name: Login to DockerHub
         password: ${{ secrets.DOCKER_PASSWORD }}
 name: Push the Docker image
 run: docker push SAS_IA
+
+name: Send Discord notification (success)
+      if: success()
+      run: |
+        curl -H "Content-Type: application/json" \-X POST \-d '{"content": "✅ Déploiement terminé avec succès sur le serveur !"}' \${{ secrets.DISCORD_WEBHOOK }}
+
+      
+name: Send Discord notification (failure)
+      if: failure()
+      run: |
+        curl -H "Content-Type: application/json" \-X POST \-d '{"content": "❌ Le déploiement CI/CD a échoué. Vérifie les logs."}' \${{ secrets.DISCORD_WEBHOOK }}
