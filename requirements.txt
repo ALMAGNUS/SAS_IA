@@ -3,3 +3,7 @@ uvicorn
 streamlit
 requests
 sqlalchemy
+scikit-learn
+mlflow
+pytest
+httpx
