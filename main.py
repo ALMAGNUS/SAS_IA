@@ -11,9 +11,11 @@ import pickle
 import mlflow
 import mlflow.sklearn
 import os
+from prometheus_fastapi_instrumentator import Instrumentator
 
 app = FastAPI()
 Base = declarative_base()
+Instrumentator().instrument(app).expose(app)
 
 class Dataset(Base):
     __tablename__ = "datasets"
