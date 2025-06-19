@@ -54,13 +54,17 @@ def make_prediction(X_test):
         logger.error("Model not found.")
         return None
     
-def send_discord_embed(message, status):
+def send_discord_embed(message, name, value):
     """Envoyer un message à un canal Discord via un Webhook."""
     data = {"embeds": [{
                 "title": "Résultats du pipeline",
                 "description": message,
                 "color": 5814783,
-                "fields": status}]}
+                "fields": [{
+                        "name": name,
+                        "value": value,
+                        "inline": True
+                    }]}]}
     response = requests.post("https://discord.com/api/webhooks/1384074986242969661/tr39sXz9sm2Q4ONQuhqYXTptDyb8XQQ_HTy872FNVYHd1lUq3agxSNYPD-bh2-209WI1", json=data)
     if response.status_code != 204:
         print(f"Erreur lors de l'envoi de l'embed : {response.status_code}")
@@ -166,7 +170,7 @@ def retrain_model():
         acc = accuracy_score(y_test, y_pred)
 
         if acc >= PERFORMANCE_THRESHOLD:
-            send_discord_embed(message="Le modèle actuel est performant", status="Pas de réentraînement nécessaire")
+            send_discord_embed(message="Le modèle actuel est performant", name="Pas de réentraînement nécessaire", value=f"Accuracy: {acc}")
             return {
                 "status": "Pas de réentraînement nécessaire",
                 "accuracy": acc,
@@ -191,12 +195,8 @@ def retrain_model():
         mlflow.log_param("n_samples", len(df))
         mlflow.log_metric("train_accuracy", model.score(X_train, y_train))
     
-    send_discord_embed(message="Le modèle a été réentraîné avec succès", status=[{
-    "status": "retrained",
-    "dataset_id": last_dataset.id,
-    "train_accuracy": model.score(X_train, y_train),
-    "test_accuracy": accuracy_score(y_test, y_pred)
-}])
+    send_discord_embed(message="Le modèle a été réentraîné avec succès", name="Réentraînement réussi", value=f"accuracy: {model.score(X_train, y_train)}"
+    )
 
     return {
         "status": "retrained",
