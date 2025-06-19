@@ -1,32 +1,24 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import pandas as pd
 from sklearn.datasets import make_classification
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score
-import pickle
-import mlflow
-import mlflow.sklearn
-import os
 from prometheus_fastapi_instrumentator import Instrumentator
 from loguru import logger
 from sklearn.model_selection import train_test_split
-import requests
+from passlib.context import CryptContext
+from jose import jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from datetime import timedelta
+from api.models.Dataset import Dataset, Base
+from api.utils import make_prediction
 
 app = FastAPI()
-Base = declarative_base()
 Instrumentator().instrument(app).expose(app)
-
-
-class Dataset(Base):
-    __tablename__ = "datasets"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    data = Column(String)  # Stockage sous forme de string (JSON)
 
 
 DATABASE_URL = "sqlite:///./api/data/datasets.db"
@@ -39,37 +31,51 @@ class GenerateRequest(BaseModel):
     n_samples: int = 100
 
 
-def make_prediction(X_test):
+# Pour le hash des mots de passe
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-    # Chargement du modèle
-    if os.path.exists("api/model.pkl"):
-        with open("api/model.pkl", "rb") as f:
-            loaded_model = pickle.load(f)
+# Pour l'authentification OAuth2
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-    # Prédiction
-        y_pred = loaded_model.predict(X_test)
+# Clé secrète et algorithme pour le JWT
+SECRET_KEY = "change_this_secret_key"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-        return y_pred
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
     else:
-        logger.error("Model not found.")
-        return None
-    
-def send_discord_embed(message, name, value):
-    """Envoyer un message à un canal Discord via un Webhook."""
-    data = {"embeds": [{
-                "title": "Résultats du pipeline",
-                "description": message,
-                "color": 5814783,
-                "fields": [{
-                        "name": name,
-                        "value": value,
-                        "inline": True
-                    }]}]}
-    response = requests.post("https://discord.com/api/webhooks/1384074986242969661/tr39sXz9sm2Q4ONQuhqYXTptDyb8XQQ_HTy872FNVYHd1lUq3agxSNYPD-bh2-209WI1", json=data)
-    if response.status_code != 204:
-        print(f"Erreur lors de l'envoi de l'embed : {response.status_code}")
-    else:
-        print("Embed envoyé avec succès !")
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+@app.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = {
+            "username":"admin",
+            "password": "password123"
+            }
+    if not user or not (form_data.password == user["password"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Identifiants invalides",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = create_access_token(
+        data={"sub": user["username"]},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @app.post("/generate")
@@ -144,63 +150,3 @@ def predict():
 @app.get("/health")
 def health():
     return JSONResponse(content="OK", status_code=200)
-
-
-@app.post("/retrain")
-def retrain_model():
-    PERFORMANCE_THRESHOLD = 0.5
-
-
-    db = SessionLocal()
-    # Récupérer le dernier dataset
-    last_dataset = db.query(Dataset).order_by(Dataset.id.desc()).first()
-    db.close()
-    if not last_dataset:
-        return {"error": "Aucun dataset trouvé."}
-
-    # Charger les données en DataFrame
-    df = pd.read_json(last_dataset.data)
-    X = df[["feature1", "feature2"]]
-    y = df["target"]
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    y_pred = make_prediction(X_test)
-    if y_pred.any(): 
-        acc = accuracy_score(y_test, y_pred)
-
-        if acc >= PERFORMANCE_THRESHOLD:
-            send_discord_embed(message="Le modèle actuel est performant", name="Pas de réentraînement nécessaire", value=f"Accuracy: {acc}")
-            return {
-                "status": "Pas de réentraînement nécessaire",
-                "accuracy": acc,
-                "threshold": PERFORMANCE_THRESHOLD
-            }
-
-    # Chargement du modèle
-    if os.path.exists("api/model.pkl"):
-        with open("api/model.pkl", "rb") as f:
-            model = pickle.load(f)
-        model.fit(X_train, y_train)
-        pickle.dump(model, open("api/model.pkl", "wb"))
-    else:
-        model = LogisticRegression(warm_start=True)
-        model.fit(X_train, y_train)
-        pickle.dump(model, open("api/model.pkl", "wb"))
-
-    # Log du modèle avec MLflow
-    with mlflow.start_run(run_name=f"retrain_dataset_{last_dataset.id}"):
-        mlflow.sklearn.log_model(model, "logistic_regression_model")
-        mlflow.log_param("dataset_id", last_dataset.id)
-        mlflow.log_param("n_samples", len(df))
-        mlflow.log_metric("train_accuracy", model.score(X_train, y_train))
-    
-    send_discord_embed(message="Le modèle a été réentraîné avec succès", name="Réentraînement réussi", value=f"accuracy: {model.score(X_train, y_train)}"
-    )
-
-    return {
-        "status": "retrained",
-        "dataset_id": last_dataset.id,
-        "train_accuracy": model.score(X_train, y_train),
-        "accuracy": accuracy_score(y_test, y_pred)
-    }

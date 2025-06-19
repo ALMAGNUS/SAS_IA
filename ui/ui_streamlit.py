@@ -18,7 +18,9 @@ def login():
     username = st.text_input("Nom d'utilisateur")
     password = st.text_input("Mot de passe", type="password")
     if st.button("Se connecter"):
-        if USERS.get(username) == password:
+        resp = requests.post(f"{API_URL}/login", data={"username": username, "password": password})
+        data = resp.json()
+        if data["access_token"]:
             st.session_state["authenticated"] = True
             st.session_state["username"] = username
             log_action(username, "Connexion réussie")
@@ -41,11 +43,6 @@ def main_app():
         resp = requests.get(f"{API_URL}/predict")
         st.write(resp.json())
         log_action(st.session_state['username'], "GET /predict")
-
-    if st.button("Réentraîner le modèle"):
-        resp = requests.post(f"{API_URL}/retrain")
-        st.write(resp.json())
-        log_action(st.session_state['username'], "POST /retrain")
 
     if st.button("Vérifier la santé de l'API"):
         resp = requests.get(f"{API_URL}/health")
