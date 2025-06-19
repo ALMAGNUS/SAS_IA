@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from main import app, SessionLocal, Dataset
+from api.main import app, SessionLocal, Dataset
 
 client = TestClient(app)
 
