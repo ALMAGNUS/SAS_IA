@@ -7,3 +7,6 @@ scikit-learn
 mlflow
 prometheus-fastapi-instrumentator
 loguru
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]
