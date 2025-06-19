@@ -1,10 +1,9 @@
 import streamlit as st
 import requests
-import logging
+from loguru import logger
 from datetime import datetime
 
-# Configuration du logger
-logging.basicConfig(filename='ui_actions.log', level=logging.INFO, format='%(asctime)s - %(message)s')
+
 
 API_URL = "http://localhost:8000"  # À adapter si besoin
 
@@ -12,7 +11,7 @@ API_URL = "http://localhost:8000"  # À adapter si besoin
 USERS = {"admin": "password123"}
 
 def log_action(user, action):
-    logging.info(f"User: {user} - Action: {action}")
+    logger.info(f"User: {user} - Action: {action}")
 
 def login():
     st.title("Authentification")
