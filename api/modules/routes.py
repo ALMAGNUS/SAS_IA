@@ -23,7 +23,6 @@ n_samples = 100
 
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    print(form_data.username)
     db = SessionLocal()
     user = db.query(Users).filter(Users.username == form_data.username).first()
     db.close()
@@ -36,16 +35,16 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
         )
     access_token = create_access_token(
         data={"sub": user.username},
-        expires_delta=timedelta(minutes=os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES"))
+        expires_delta=timedelta(minutes=int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES")))
     )
     logger.info("Login successful")
     return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.post("/generate")
-def generate_dataset(req):
+def generate_dataset():
     try:
-        n = req.n_samples
+        n = n_samples
         hour = datetime.now().hour
         sign = 1 if (hour % 2 == 0) else -1
 
