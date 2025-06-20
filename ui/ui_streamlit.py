@@ -1,17 +1,17 @@
 import streamlit as st
 import requests
 from loguru import logger
-from datetime import datetime
 
 
-
-API_URL = "http://localhost:8000"  # À adapter si besoin
+API_URL = "http://localhost:8000/api"  # À adapter si besoin
 
 # Utilisateurs autorisés (à améliorer pour production)
 USERS = {"admin": "password123"}
 
+
 def log_action(user, action):
     logger.info(f"User: {user} - Action: {action}")
+
 
 def login():
     st.title("Authentification")
@@ -25,9 +25,11 @@ def login():
             st.session_state["username"] = username
             log_action(username, "Connexion réussie")
             st.success("Connecté !")
+            st.rerun()
         else:
             log_action(username, "Échec de connexion")
             st.error("Identifiants invalides")
+
 
 def main_app():
     st.title("Interface de gestion API IA")
@@ -52,7 +54,8 @@ def main_app():
     if st.button("Se déconnecter"):
         st.session_state["authenticated"] = False
         st.session_state["username"] = ""
-        st.experimental_rerun()
+        st.rerun()
+
 
 def main():
     if "authenticated" not in st.session_state:

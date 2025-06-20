@@ -5,7 +5,9 @@ from sqlalchemy import pool
 
 from alembic import context
 
-from api.main import Base
+from api.data.db_manager import Base
+import api.models
+
 target_metadata = Base.metadata
 
 # this is the Alembic Config object, which provides

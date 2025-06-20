@@ -1,8 +1,8 @@
 from sqlalchemy import Column, Integer, String
 from api.data.db_manager import Base
 
-
-class Dataset(Base):
-    __tablename__ = "datasets"
+class Users(Base):
+    __tablename__ = "users"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    data = Column(String)  # Stockage sous forme de string (JSON)
+    username = Column(String)
+    password_hash = Column(String)
